@@ -49,7 +49,7 @@ def main():
         return
 
     # Create a window
-    window = glfw.create_window(600, 600, "Shader", None, None)
+    window = glfw.create_window(1200, 600, "Shader", None, None)
     if not window:
         glfw.terminate()
         return
