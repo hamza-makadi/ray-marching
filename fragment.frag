@@ -1,13 +1,19 @@
 #version 330 core
 
+#define PI 3.14159265
+#define TAU (2*PI)
 
 out vec4 fragColor;
 
 uniform float screenWidth;
 uniform float screenHeight;
 
+uniform float mouseX;
+uniform float mouseY;
+
 uniform float time;
 
+vec2 mousePos = vec2(mouseX, mouseY);
 vec2 Resolution = vec2(screenWidth, screenHeight);
 
 //define some constante
@@ -20,11 +26,11 @@ vec3 getMaterial(vec3 p, float id){
     vec3 m;
     switch(int(id)){
         case 1:
-        m = vec3(0.0, 0.5, 0.5); break;
+        m = vec3(0.2 + 0.4 * mod(floor(p.x)+floor(p.z), 2.0)); break;
         case 2 :
         m = vec3(0.9, 0.9, 0.0); break;
         case 3 :
-        m = vec3(0.8, 0.0, 0.0); break;
+        m = vec3(5., 0.0, 0.0); break;
         case 4 :
         m = vec3(0.0, 0.0, 0.7); break;
     }
@@ -50,6 +56,13 @@ vec3 pMod3(inout vec3 p, vec3 size) {
     vec3 c = floor((p + size*0.5)/size);
     p = mod(p + size*0.5, size) - size*0.5;
     return c;
+}
+
+// Rotate around a coordinate axis (i.e. in a plane perpendicular to that axis) by angle <a>.
+// Read like this: R(p.xz, a) rotates "x towards z".
+// This is fast if <a> is a compile-time constant and slower (but still practical) if not.
+void pR(inout vec2 p, float a) {
+    p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
 }
 
 /////////////////////////////////////////////
@@ -148,31 +161,62 @@ float softshadow(vec3 ro,vec3 rd, float mint, float maxt, float k )
 //Lighting the scene
 vec3 getLight(vec3 p, vec3 rayDir, vec3 color){
     //lightin using lambert's cosin law
-    vec3 lightPos = vec3(20.0, 80.0, -30.0);
+    vec3 lightPos = vec3(10.0, 80.0, -30.0);
     vec3 L = normalize(lightPos - p);
     vec3 N = getNormal(p);
+    vec3 V = -rayDir;
+    vec3 R = reflect(-L, N);
 
-    vec3 diffuse = color * clamp(dot(L,N), 1.0, 1.0);
+    vec3 specColor = vec3(0.5);
+    vec3 specular = specColor * pow(clamp(dot(R, V), 0.0, 1.0), 10.0);
+    vec3 diffuse = color * clamp(dot(L, N) ,0.0 ,1.0);
+    vec3 ambient = color * 0.05;
 
     //shadows 
     //float shadows = shadow(p + N *0.02 , normalize(lightPos),0.0, 1.0);
     float shadows = softshadow(p + N *0.02,normalize(lightPos),.01, 100.0, 2.0);
+    if(shadows == 0.0)return ambient; 
 
-    return diffuse*vec3(shadows); 
+    return (diffuse + ambient + specular); 
        
 }
 
+//camera position and rotation
+mat3 getCamera(vec3 rayOrigin, vec3 lookAt){
+    vec3 camF = normalize(vec3(lookAt - rayOrigin));
+    vec3 camR = normalize(cross(vec3(0., 1., 0.), camF));
+    vec3 camU = cross(camF, camR);
+    return mat3(camR, camU, camF);
+}
+
+//mouse control
+void mouseControl(inout vec3 ro){
+    vec2 m = mousePos / Resolution;
+    pR(ro.yz, m.y * PI * 0.5 - 0.5);
+    pR(ro.xz, m.x * TAU);
+}
+
+
 void render(inout vec3 col,in vec2 uv){
     //define ray origine and normilaized ray direction
-    vec3 rayOrigin = vec3(0.0, 0.0, -3.0);
-    vec3 rayDir = normalize(vec3(uv,FOV));
+    vec3 rayOrigin = vec3(.0, 1.0, -3.0);
+    mouseControl(rayOrigin);
+
+    vec3 lookAt = vec3(0., 1., 0.);
+    vec3 rayDir = getCamera(rayOrigin,lookAt) * normalize(vec3(uv,FOV));
 
     vec2 object = rayMarch(rayOrigin, rayDir);
+
+    vec3 background = vec3(0.5, 0.8, 0.9);
 
     if(object.x < MAX_DIST){
         vec3 p = rayOrigin + object.x * rayDir;
         vec3 material = getMaterial(p, object.y);
         col += getLight(p, rayDir, material);
+        //fog effect
+        col = mix(col, background, 1.0 - exp(-0.0008 * object.x * object.x) );
+    }else{
+        col += background - max(0.95 * rayDir.y, 0.0);
     }
 }
 

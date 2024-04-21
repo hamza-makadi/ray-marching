@@ -38,6 +38,10 @@ def load_shader_program(vertex_shader_source, fragment_shader_source):
     return program
 
 
+def key_callback(window, key, scancode, action, mods):
+    if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
+        glfw.set_window_should_close(window, True)
+    
 
 def main():
 
@@ -51,12 +55,15 @@ def main():
 
     # Create a window
     window = glfw.create_window(1200, 600, "Shader", None, None)
+    glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
+
     if not window:
         glfw.terminate()
         return
 
     # Make the window's context current
     glfw.make_context_current(window)
+    glfw.set_key_callback(window, key_callback)
 
     vertex_shader_source = load_fragment_file("vertex.vert")
 
@@ -67,8 +74,12 @@ def main():
 
     # Get window size
     window_width, window_height = glfw.get_framebuffer_size(window)
+    mouse_x, mouse_y = glfw.get_cursor_pos(window)
+
 
     #Get the locations of the uniform variables in the shader
+    mouse_x_uniform_location = glGetUniformLocation(shader_program, "mouseX")
+    mouse_y_uniform_location = glGetUniformLocation(shader_program, "mouseY")
     screen_width_uniform_location = glGetUniformLocation(shader_program, "screenWidth")
     screen_height_uniform_location = glGetUniformLocation(shader_program, "screenHeight")
     time_uniform_location = glGetUniformLocation(shader_program, "time")
@@ -119,6 +130,8 @@ def main():
 
 
         # Set the values of the uniform variables
+        glUniform1f(mouse_x_uniform_location, mouse_x)
+        glUniform1f(mouse_y_uniform_location, mouse_y)
         glUniform1f(screen_width_uniform_location, window_width)
         glUniform1f(screen_height_uniform_location, window_height)
 
@@ -126,6 +139,13 @@ def main():
         glfw.poll_events()
 
         current_time = time.time() - start_time
+
+        mouse_x, mouse_y = glfw.get_cursor_pos(window)
+
+
+        #Get the locations of the uniform variables in the shader
+        mouse_x_uniform_location = glGetUniformLocation(shader_program, "mouseX")
+        mouse_y_uniform_location = glGetUniformLocation(shader_program, "mouseY")
 
         # Set the value of the uniform variable for time
         glUseProgram(shader_program)
