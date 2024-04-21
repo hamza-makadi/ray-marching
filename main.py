@@ -1,10 +1,11 @@
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 import glfw, time
-import numpy as np
-from PIL import Image
+
 
 def capture_frame(filename, width, height):
+    import numpy as np
+    from PIL import Image
     data = glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
     image = Image.frombytes("RGB", (width, height), data)
     image = image.transpose(Image.FLIP_TOP_BOTTOM)  # OpenGL renders bottom to top, so flip the image
