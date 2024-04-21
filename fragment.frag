@@ -20,9 +20,13 @@ vec3 getMaterial(vec3 p, float id){
     vec3 m;
     switch(int(id)){
         case 1:
-        m = vec3(0.9, 0.9, 0.0); break;
-        case 2 :
         m = vec3(0.0, 0.5, 0.5); break;
+        case 2 :
+        m = vec3(0.9, 0.9, 0.0); break;
+        case 3 :
+        m = vec3(0.8, 0.0, 0.0); break;
+        case 4 :
+        m = vec3(0.0, 0.0, 0.7); break;
     }
     return m;
 }
@@ -32,8 +36,8 @@ vec3 getMaterial(vec3 p, float id){
 //you can find all this functions here >>> https://mercury.sexy/hg_sdf/ <<<
 
 //SDF sphere
-float fSphere(vec3 p, float r) {
-    return length(p) - r;
+float fSphere(vec3 p, vec3 center, float r) {
+    return length(p - center) - r;
 }
 
 // Plane with normal n (n is normalized) at some distance from the origin
@@ -59,14 +63,29 @@ vec2 fOpUnionID(vec2 res1, vec2 res2){
 vec2 map(vec3 p){   
     //plane
     float planeDIST = fPlane(p, vec3(0,1,0), 1.0);
-    float planeID = 2.0;
+    float planeID = 1.0;
     vec2 plane = vec2(planeDIST, planeID);
-    //sphere
-    float sphereDIST = fSphere(p, 1.0);
-    float sphereID = 1.0;
-    vec2 sphere = vec2(sphereDIST, sphereID);
+
+    //yellow sphere
+    vec3 spherePos1 = vec3(0,abs(sin(time)*1.5),0);
+    float sphereDIST1 = fSphere(p,spherePos1, 1.0);
+    float sphereID1 = 2.0;
+    vec2 sphere1 = vec2(sphereDIST1, sphereID1);
+
+    //red sphere
+    vec3 spherePos2 = vec3(2.5,abs(sin(time+5)),0);
+    float sphereDIST2 = fSphere(p,spherePos2, 0.5);
+    float sphereID2 = 3.0;
+    vec2 sphere2 = vec2(sphereDIST2, sphereID2);
+
+    //bleu sphere
+    vec3 spherePos3 = vec3(-2.5,abs(sin(time+2)*1.2),0);
+    float sphereDIST3 = fSphere(p,spherePos3, 0.8);
+    float sphereID3 = 4.0;
+    vec2 sphere3 = vec2(sphereDIST3, sphereID3);
+
     //result
-    vec2 res = fOpUnionID(sphere,plane);
+    vec2 res = fOpUnionID(fOpUnionID(fOpUnionID(sphere1,plane),sphere2),sphere3);
     return res;
 }
 
@@ -96,6 +115,35 @@ vec3 getNormal(vec3 p){
     vec3 n = vec3(map(p).x) - vec3(map(p - e.xyy).x , map(p - e.yxy).x , map(p - e.yyx).x );
     return normalize(n);
 }
+//shadow functions
+//>>>> https://iquilezles.org/articles/rmshadows/   <<<<
+float shadow( vec3 ro, vec3 rd, float mint, float maxt )
+{
+    float t = mint;
+    for( int i=0; i<256 && t<maxt; i++ )
+    {
+        vec2 h = map(ro + rd*t);
+        if( h.x<0.001 )
+            return 0.0;
+        t += h.x;
+    }
+    return 1.0;
+}
+
+float softshadow(vec3 ro,vec3 rd, float mint, float maxt, float k )
+{
+    float res = 1.0;
+    float t = mint;
+    for( int i=0; i<256 && t<maxt; i++ )
+    {
+        vec2 h = map(ro + rd*t);
+        if( h.x<0.001 )
+            return 0.0;
+        res = min( res, k*h.x/t );
+        t += h.x;
+    }
+    return res;
+}
 
 //Lighting the scene
 vec3 getLight(vec3 p, vec3 rayDir, vec3 color){
@@ -104,15 +152,14 @@ vec3 getLight(vec3 p, vec3 rayDir, vec3 color){
     vec3 L = normalize(lightPos - p);
     vec3 N = getNormal(p);
 
-    vec3 diffuse = color * clamp(dot(L,N), 0.0, 1.0);
+    vec3 diffuse = color * clamp(dot(L,N), 1.0, 1.0);
 
     //shadows 
-    vec2 d = rayMarch(p , normalize(lightPos));
-    if(d.x < length(lightPos - p )){
-        return vec3(0);
-    }else{
-        return diffuse; 
-    }    
+    //float shadows = shadow(p + N *0.02 , normalize(lightPos),0.0, 1.0);
+    float shadows = softshadow(p + N *0.02,normalize(lightPos),.01, 100.0, 2.0);
+
+    return diffuse*vec3(shadows); 
+       
 }
 
 void render(inout vec3 col,in vec2 uv){
